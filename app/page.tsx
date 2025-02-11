@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import io, { Socket } from "socket.io-client";
 import ReactMarkdown from "react-markdown";
+import IconButton from "@/components/IconButton";
+import { Aperture, AudioLines, Keyboard } from "lucide-react";
+import useSlideFromTop from "@/hooks/useSlideFromTop";
 
 type Data = {
   markdownResponse: string;
@@ -13,6 +16,11 @@ const SocketChat = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   const [markdown, setMarkdown] = useState("");
+
+  const { toggleSlide, SlideComponent } = useSlideFromTop({
+    height: 200,
+    duration: 0.5,
+  });
 
   useEffect(() => {
     // Connect to the server (Socket.IO defaults to localhost:3000)
@@ -40,7 +48,7 @@ const SocketChat = () => {
 
     // Handle socket error event
     socketIo.on("connect_error", (error: Error) => {
-      alert(error);
+      // alert(error);
       console.log("Error connecting to server", error);
     });
 
@@ -51,6 +59,10 @@ const SocketChat = () => {
 
     socketIo.on("markdown_response", (data: Data) => {
       setMarkdown(data.markdownResponse.slice(3, -3));
+    });
+
+    socketIo.on("recording", () => {
+      toggleSlide();
     });
 
     // Cleanup on unmount
@@ -69,19 +81,27 @@ const SocketChat = () => {
 
   return (
     <div className="flex flex-col h-screen">
+      <SlideComponent />
       {/* First Div - Takes remaining space */}
       <div className="flex-1 overflow-auto p-4">
         <ReactMarkdown>{markdown}</ReactMarkdown>
       </div>
 
       {/* Second Div - Fixed Height */}
-      <div className="h-16 bg-gray-800 text-white flex justify-left">
-        <button
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+      <div className="h-20 flex items-center justify-between gap-4 bg-gray-700 px-12 py-8 border-t-2 border-gray-600">
+        <IconButton
+          icon={Aperture}
           onClick={sendMessage}
-        >
-          get answer
-        </button>
+          variant="secondary"
+          size="small"
+        />
+        <IconButton
+          icon={AudioLines}
+          onClick={toggleSlide}
+          variant="secondary"
+          size="small"
+        />
+        <IconButton icon={Keyboard} variant="secondary" size="small" />
       </div>
     </div>
   );
