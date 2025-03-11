@@ -101,7 +101,16 @@ const SocketChat = () => {
           variant="secondary"
           size="small"
         />
-        <IconButton icon={Keyboard} variant="secondary" size="small" />
+        <IconButton
+          icon={Keyboard}
+          onClick={() => {
+            setMarkdown(
+              `I am a Full Stack Developer with over 7 years of experience, specializing in AI integrations, LLMs, and automation. I have hands-on experience with LangChain, OpenAI API, TensorFlow, and PyTorch, and I’ve worked extensively on developing AI-driven workflows, integrating APIs, and optimizing business operations using AI agents. My expertise also includes vector databases, RAG (Retrieval-Augmented Generation), and cloud-based AI deployments (AWS, Azure, GCP).\nIn my recent projects, I have developed autonomous content creation pipelines using AI and automated real-time business insights with NLP-powered AI models. My strong background in Python, API development, and AI orchestration makes me confident in contributing to ASTUDIO’s mission of building intelligent AI agents.`
+            );
+          }}
+          variant="secondary"
+          size="small"
+        />
       </div>
     </div>
   );
