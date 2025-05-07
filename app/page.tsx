@@ -2,10 +2,10 @@
 // components/SocketChat.tsx
 import { useState, useEffect } from "react";
 import io, { Socket } from "socket.io-client";
-import ReactMarkdown from "react-markdown";
 import IconButton from "@/components/IconButton";
 import { Aperture, AudioLines, Keyboard } from "lucide-react";
 import useSlideFromTop from "@/hooks/useSlideFromTop";
+import { renderMarkdown } from '@/lib/markdown';
 
 type Data = {
   markdownResponse: string;
@@ -15,7 +15,7 @@ type Data = {
 const SocketChat = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
-  const [markdown, setMarkdown] = useState("");
+  const [markdown, setMarkdown] = useState(``);
 
   const { toggleSlide, SlideComponent } = useSlideFromTop({
     height: 200,
@@ -84,8 +84,19 @@ const SocketChat = () => {
       <SlideComponent />
       {/* First Div - Takes remaining space */}
       <div className="flex-1 overflow-auto p-4">
-        <ReactMarkdown>{markdown}</ReactMarkdown>
+      <div
+        className="prose dark:prose-invert max-w-none"
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }}
+      />
       </div>
+
+      <input
+        type="text"
+        value={markdown}
+        onChange={(e) => setMarkdown(e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded"
+        placeholder="Type your message here..."
+      />
 
       {/* Second Div - Fixed Height */}
       <div className="h-20 flex items-center justify-between gap-4 bg-gray-700 px-12 py-8 border-t-2 border-gray-600">
