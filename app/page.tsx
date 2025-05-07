@@ -58,7 +58,7 @@ const SocketChat = () => {
     });
 
     socketIo.on("markdown_response", (data: Data) => {
-      setMarkdown(data.markdownResponse.slice(3, -3));
+      setMarkdown(data.markdownResponse);
     });
 
     socketIo.on("recording", () => {
