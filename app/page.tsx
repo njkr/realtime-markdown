@@ -5,11 +5,10 @@ import io, { Socket } from "socket.io-client";
 import IconButton from "@/components/IconButton";
 import { Aperture, AudioLines, Keyboard } from "lucide-react";
 import useSlideFromTop from "@/hooks/useSlideFromTop";
-import { renderMarkdown } from '@/lib/markdown';
+import { renderMarkdown } from "@/lib/markdown";
 
 type Data = {
-  markdownResponse: string;
-  isError: boolean;
+  content: string;
 };
 
 const SocketChat = () => {
@@ -57,8 +56,21 @@ const SocketChat = () => {
       console.log("Disconnected from server");
     });
 
-    socketIo.on("markdown_response", (data: Data) => {
-      setMarkdown(data.markdownResponse);
+    socketIo.on("stream_start", () => {
+      setMarkdown("");
+    });
+
+    socketIo.on("stream_response", (data: Data) => {
+      console.log("stream_response", data);
+      setMarkdown((prev) => prev + data.content);
+    });
+
+    socketIo.on("stream_end", () => {
+      console.log("stream_end");
+    });
+
+    socketIo.on("stream_error", (data: Data) => {
+      console.log("stream_error", data);
     });
 
     socketIo.on("recording", () => {
@@ -84,19 +96,11 @@ const SocketChat = () => {
       <SlideComponent />
       {/* First Div - Takes remaining space */}
       <div className="flex-1 overflow-auto p-4">
-      <div
-        className="prose dark:prose-invert max-w-none"
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }}
-      />
+        <div
+          className="prose dark:prose-invert max-w-none"
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }}
+        />
       </div>
-
-      <input
-        type="text"
-        value={markdown}
-        onChange={(e) => setMarkdown(e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded"
-        placeholder="Type your message here..."
-      />
 
       {/* Second Div - Fixed Height */}
       <div className="h-20 flex items-center justify-between gap-4 bg-gray-700 px-12 py-8 border-t-2 border-gray-600">
