@@ -1,29 +1,78 @@
 "use client";
 // components/SocketChat.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import io, { Socket } from "socket.io-client";
 import IconButton from "@/components/IconButton";
-import { Aperture, AudioLines, Keyboard } from "lucide-react";
-import useSlideFromTop from "@/hooks/useSlideFromTop";
-import { renderMarkdown } from "@/lib/markdown";
+import { Aperture, Keyboard, Mic } from "lucide-react";
+import QASectionCard from "@/components/QASectionCard";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import AppNavbar from "@/components/AppNavbar";
+
+type MessageStatus = "start" | "streaming" | "end";
 
 type Data = {
-  content: string;
+  question?: string;
+  id: string;
+  type: "text" | "audio" | "record";
+  content?: string;
+  isError: boolean;
+  status: MessageStatus;
+  createdAt?: string;
 };
+
+type StreamData = {
+  id: string;
+  type?: "text" | "audio" | "record";
+  question?: string;
+  answer?: string;
+  isStreaming: boolean;
+  createdAt?: string;
+};
+
+type ActiveStream = Record<string, StreamData>;
 
 const SocketChat = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
-  const [markdown, setMarkdown] = useState(``);
+  const [activeStream, setActiveStream] = useState<ActiveStream>({});
 
-  const { toggleSlide, SlideComponent } = useSlideFromTop({
-    height: 200,
-    duration: 0.5,
-  });
+  const [openDeleteId, setOpenDeleteId] = useState<string | null>(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+
+  const [showNavbar, setShowNavbar] = useState(true);
+  const lastScrollY = useRef(0);
+  const upwardScrollDelta = useRef(0);
+  const scrollThreshold = 30; // px to scroll up before showing navbar again
 
   useEffect(() => {
     // Connect to the server (Socket.IO defaults to localhost:3000)
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      const delta = currentY - lastScrollY.current;
 
+      // Scrolling down
+      if (delta > 0) {
+        if (currentY > 50) {
+          setShowNavbar(false);
+          upwardScrollDelta.current = 0;
+        }
+      }
+
+      // Scrolling up
+      else if (delta < 0) {
+        upwardScrollDelta.current += Math.abs(delta);
+
+        if (upwardScrollDelta.current > scrollThreshold) {
+          setShowNavbar(true);
+          upwardScrollDelta.current = 0;
+        }
+      }
+
+      lastScrollY.current = currentY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
     const socketIo = io(
       (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as string) ||
         "http://localhost:3000",
@@ -34,11 +83,6 @@ const SocketChat = () => {
 
     // Save the socket instance
     setSocket(socketIo);
-
-    // Listen for messages from the server
-    socketIo.on("receiveMessage", (newMessage: string) => {
-      console.log("newMessage", newMessage);
-    });
 
     // Handle socket connection event
     socketIo.on("connect", () => {
@@ -56,80 +100,138 @@ const SocketChat = () => {
       console.log("Disconnected from server");
     });
 
-    socketIo.on("stream_start", () => {
-      setMarkdown("");
+    socketIo.on("recording_event", (is_Recording: boolean) => {
+      setIsRecording(is_Recording);
     });
 
     socketIo.on("stream_response", (data: Data) => {
-      console.log("stream_response", data);
-      setMarkdown((prev) => prev + data.content);
-    });
+      const { id, type, question, content, status, createdAt } = data;
 
-    socketIo.on("stream_end", () => {
-      console.log("stream_end");
-    });
+      setActiveStream((prev) => {
+        const existing = prev[id] || {};
 
-    socketIo.on("stream_error", (data: Data) => {
-      console.log("stream_error", data);
-    });
+        if (status === "start") {
+          return {
+            ...prev,
+            [id]: {
+              id,
+              type,
+              question,
+              answer: "",
+              isStreaming: true,
+              createdAt,
+            },
+          };
+        }
 
-    socketIo.on("recording", () => {
-      toggleSlide();
+        if (status === "streaming") {
+          return {
+            ...prev,
+            [id]: {
+              ...existing,
+              answer: (existing.answer || "") + (content || ""),
+              isStreaming: true,
+            },
+          };
+        }
+
+        if (status === "end") {
+          return {
+            ...prev,
+            [id]: {
+              ...existing,
+              isStreaming: false,
+            },
+          };
+        }
+
+        return prev;
+      });
     });
 
     // Cleanup on unmount
     return () => {
       socketIo.disconnect();
       console.log("Socket disconnected on cleanup");
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
 
   const sendMessage = () => {
     if (socket) {
-      setMarkdown("");
-      socket.emit("get_answer", "hello");
+      // setMarkdown("");
+      socket.emit("take_screenshot");
+    }
+  };
+
+  const handleRecording = () => {
+    if (socket) {
+      socket.emit("recording_event_client", !isRecording);
     }
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      <SlideComponent />
-      {/* First Div - Takes remaining space */}
-      <div className="flex-1 overflow-auto p-4">
-        <div
-          className="prose dark:prose-invert max-w-none"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }}
-        />
+    <div className="flex flex-col h-screen bg-gray-950 text-gray-200">
+      {/* Navbar */}
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${
+          showNavbar ? "translate-y-0" : "-translate-y-full"
+        }`}
+      >
+        <AppNavbar />
+      </div>
+      {/* Scrollable QA Content */}
+      <div className="pt-[64px] flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+        {Object.entries(activeStream).map(([id, data]) => (
+          <QASectionCard
+            key={id}
+            question={data.question || ""}
+            answer={data.answer || ""}
+            onDelete={() => setOpenDeleteId(id)}
+            onEdit={() => console.log("Edit clicked")}
+            isStreaming={data.isStreaming}
+            createdAt={data.createdAt}
+            type={data.type}
+          />
+        ))}
       </div>
 
-      {/* Second Div - Fixed Height */}
-      <div className="h-20 flex items-center justify-between gap-4 bg-gray-700 px-12 py-8 border-t-2 border-gray-600">
+      {/* Sticky Bottom Action Bar */}
+      <div className="h-20 flex items-center justify-evenly gap-4 bg-gray-900 px-6 py-4 border-t border-gray-700">
         <IconButton
           icon={Aperture}
           onClick={sendMessage}
           variant="secondary"
-          size="small"
+          size="medium"
         />
         <IconButton
-          icon={AudioLines}
-          onClick={toggleSlide}
+          icon={Mic}
+          onClick={handleRecording}
           variant="secondary"
-          size="small"
+          size="medium"
+          glow={isRecording}
         />
         <IconButton
           icon={Keyboard}
-          onClick={() => {
-            setMarkdown(
-              `I'm Jenkins Raj, a Full Stack Web Developer with over 7 years of experience, primarily focused on the MERN stack and modern fintech and Web3 technologies. Currently, I’m working at Skyland Technology in Dubai, where I’ve been leading development on metaverse and NFT-related projects using NestJS, Next.js, and AWS, while also integrating AI and blockchain components like ERC20/721 smart contracts and real-time WebSocket communication.
-              /n Before that, I developed mission-critical systems like Warehouse Management and POS platforms at Brands for Less, leveraging technologies such as NestJS, React, MongoDB, and Docker. I also introduced AI-powered forecasting and Power BI dashboards to enhance business decision-making.
-              /n I have extensive experience building secure, scalable backends with Node.js and Express, and responsive frontends using Next.js and Tailwind. I’ve integrated major payment gateways, worked with real-time systems, deployed CI/CD pipelines using GitHub Actions, and even implemented AI/ML models using FastAPI and TensorFlow.
-              /n What excites me most about the role at HRA Web3 is the opportunity to combine my fintech, Web3, and full stack skills to build scalable, secure global payment solutions through platforms like HRA ePay. I’m especially interested in the integration with Stripe, crypto wallets, and card issuing APIs like Wallester—areas I’ve already worked in or am passionate about exploring further.`
-            );
-          }}
+          onClick={() => console.log("Typing...")}
           variant="secondary"
-          size="small"
+          size="medium"
         />
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        open={openDeleteId !== null}
+        onClose={() => setOpenDeleteId(null)}
+        onDelete={() => {
+          setActiveStream((prev) => {
+            const newState = { ...prev };
+            delete newState[openDeleteId as string];
+            return newState;
+          });
+          setOpenDeleteId(null);
+        }}
+      />
     </div>
   );
 };
