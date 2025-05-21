@@ -1,17 +1,20 @@
+"use client";
 import { renderMarkdown } from "@/lib/markdown";
-import React from "react";
+import React, { useState } from "react";
 import {
   Pencil,
   Trash2,
-  HelpCircle,
   CheckCircle,
   Loader2,
   Text,
   Mic,
   FileText,
 } from "lucide-react";
+import EditableQuestion from "./EditableQuestion";
+import { useSocket } from "@/context/SocketContext";
 
 interface QASectionCardProps {
+  id: string;
   question: string;
   answer: string;
   onEdit?: () => void;
@@ -28,15 +31,26 @@ const typeIconMap = {
 };
 
 const QASectionCard: React.FC<QASectionCardProps> = ({
+  id,
   question,
   answer,
-  onEdit,
   onDelete,
   type = "audio",
   createdAt = "12:00 PM",
   isStreaming = true,
 }) => {
+  const { socket } = useSocket();
+  const [localQuestion, setLocalQuestion] = useState(question);
+  const [isEditingQuestion, setIsEditingQuestion] = useState(false);
   const TypeIcon = typeIconMap[type] || Text;
+
+  const handleOnSend = (newVal: string): void => {
+    setLocalQuestion(newVal);
+    setIsEditingQuestion(false);
+    if (socket) {
+      socket.emit("streaming_event", { text: newVal, type, id });
+    }
+  };
 
   return (
     <div className="m-2">
@@ -49,12 +63,14 @@ const QASectionCard: React.FC<QASectionCardProps> = ({
             {createdAt && <span className="ml-2">• {createdAt}</span>}
           </div>
           <div className="flex gap-2">
-            <button
-              className="text-gray-400 hover:text-blue-500"
-              onClick={onEdit}
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
+            {!isStreaming && (
+              <button
+                className="text-gray-400 hover:text-blue-500"
+                onClick={() => setIsEditingQuestion(true)}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
             <button
               className="text-gray-400 hover:text-red-500"
               onClick={onDelete}
@@ -65,15 +81,12 @@ const QASectionCard: React.FC<QASectionCardProps> = ({
         </div>
 
         {/* Question Section */}
-        <div className="mb-4">
-          <div className="flex items-center gap-1 font-medium mb-2">
-            <HelpCircle className="h-4 w-4 text-blue-500" />
-            <span>Question</span>
-          </div>
-          <div className="rounded-md bg-gray-100 dark:bg-gray-800 p-3 max-h-40 overflow-y-auto">
-            <p className="text-xs leading-snug break-words">{question}</p>
-          </div>
-        </div>
+        <EditableQuestion
+          value={localQuestion}
+          isEditing={isEditingQuestion}
+          onEditCancel={() => setIsEditingQuestion(false)}
+          onSend={handleOnSend}
+        />
 
         {/* Answer Section */}
         <div>

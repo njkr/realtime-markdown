@@ -1,12 +1,12 @@
 "use client";
 // components/SocketChat.tsx
 import { useState, useEffect, useRef } from "react";
-import io, { Socket } from "socket.io-client";
 import IconButton from "@/components/IconButton";
 import { Aperture, Keyboard, Mic } from "lucide-react";
 import QASectionCard from "@/components/QASectionCard";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import AppNavbar from "@/components/AppNavbar";
+import { useSocket } from "@/context/SocketContext";
 
 type MessageStatus = "start" | "streaming" | "end";
 
@@ -31,10 +31,47 @@ type StreamData = {
 
 type ActiveStream = Record<string, StreamData>;
 
-const SocketChat = () => {
-  const [socket, setSocket] = useState<Socket | null>(null);
+const dummyStreams: ActiveStream = {
+  "stream-1": {
+    id: "stream-1",
+    type: "text",
+    question: "What is the capital of France?",
+    answer: "The capital of France is **Paris**.",
+    isStreaming: false,
+    createdAt: "10:45 AM",
+  },
+  "stream-2": {
+    id: "stream-2",
+    type: "audio",
+    question: "Explain the theory of relativity.",
+    answer:
+      "Einstein's theory of relativity includes both special and general relativity.",
+    isStreaming: true,
+    createdAt: "11:00 AM",
+  },
+  "stream-3": {
+    id: "stream-3",
+    type: "record",
+    question: "Summarize the meeting notes.",
+    answer: "",
+    isStreaming: true,
+    createdAt: "11:15 AM",
+  },
+  "stream-4": {
+    id: "stream-4",
+    type: "text",
+    question: "How to center a div in CSS?",
+    answer:
+      "You can use `display: flex; justify-content: center; align-items: center;`.",
+    isStreaming: false,
+    createdAt: "11:30 AM",
+  },
+};
 
-  const [activeStream, setActiveStream] = useState<ActiveStream>({});
+const SocketChat = () => {
+  const { socket } = useSocket();
+
+  const [activeStream, setActiveStream] = useState<ActiveStream>(dummyStreams);
 
   const [openDeleteId, setOpenDeleteId] = useState<string | null>(null);
 
@@ -73,38 +110,22 @@ const SocketChat = () => {
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    const socketIo = io(
-      (process.env.NEXT_PUBLIC_SOCKET_SERVER_URL as string) ||
-        "http://localhost:3000",
-      {
-        transports: ["websocket"], // Force WebSocket
-      }
-    );
 
-    // Save the socket instance
-    setSocket(socketIo);
+    // Cleanup on unmount
+    return () => {
+      console.log("Socket disconnected on cleanup");
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
-    // Handle socket connection event
-    socketIo.on("connect", () => {
-      console.log("Connected to server");
-    });
+  useEffect(() => {
+    if (!socket) return;
 
-    // Handle socket error event
-    socketIo.on("connect_error", (error: Error) => {
-      // alert(error);
-      console.log("Error connecting to server", error);
-    });
-
-    // Handle socket disconnection event
-    socketIo.on("disconnect", () => {
-      console.log("Disconnected from server");
-    });
-
-    socketIo.on("recording_event", (is_Recording: boolean) => {
+    socket.on("recording_event", (is_Recording: boolean) => {
       setIsRecording(is_Recording);
     });
 
-    socketIo.on("stream_response", (data: Data) => {
+    socket.on("stream_response", (data: Data) => {
       const { id, type, question, content, status, createdAt } = data;
 
       setActiveStream((prev) => {
@@ -148,14 +169,7 @@ const SocketChat = () => {
         return prev;
       });
     });
-
-    // Cleanup on unmount
-    return () => {
-      socketIo.disconnect();
-      console.log("Socket disconnected on cleanup");
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
+  }, [socket]);
 
   const sendMessage = () => {
     if (socket) {
@@ -185,6 +199,7 @@ const SocketChat = () => {
         {Object.entries(activeStream).map(([id, data]) => (
           <QASectionCard
             key={id}
+            id={id}
             question={data.question || ""}
             answer={data.answer || ""}
             onDelete={() => setOpenDeleteId(id)}
