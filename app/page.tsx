@@ -31,47 +31,10 @@ type StreamData = {
 
 type ActiveStream = Record<string, StreamData>;
 
-const dummyStreams: ActiveStream = {
-  "stream-1": {
-    id: "stream-1",
-    type: "text",
-    question: "What is the capital of France?",
-    answer: "The capital of France is **Paris**.",
-    isStreaming: false,
-    createdAt: "10:45 AM",
-  },
-  "stream-2": {
-    id: "stream-2",
-    type: "audio",
-    question: "Explain the theory of relativity.",
-    answer:
-      "Einstein's theory of relativity includes both special and general relativity.",
-    isStreaming: true,
-    createdAt: "11:00 AM",
-  },
-  "stream-3": {
-    id: "stream-3",
-    type: "record",
-    question: "Summarize the meeting notes.",
-    answer: "",
-    isStreaming: true,
-    createdAt: "11:15 AM",
-  },
-  "stream-4": {
-    id: "stream-4",
-    type: "text",
-    question: "How to center a div in CSS?",
-    answer:
-      "You can use `display: flex; justify-content: center; align-items: center;`.",
-    isStreaming: false,
-    createdAt: "11:30 AM",
-  },
-};
-
 const SocketChat = () => {
   const { socket } = useSocket();
 
-  const [activeStream, setActiveStream] = useState<ActiveStream>(dummyStreams);
+  const [activeStream, setActiveStream] = useState<ActiveStream>({});
 
   const [openDeleteId, setOpenDeleteId] = useState<string | null>(null);
 
