@@ -7,6 +7,8 @@ import QASectionCard from "@/components/QASectionCard";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import AppNavbar from "@/components/AppNavbar";
 import { useSocket } from "@/context/SocketContext";
+import { AnimatePresence, motion } from "framer-motion";
+import TextInputBar from "@/components/TextInputBar";
 
 type MessageStatus = "start" | "streaming" | "end";
 
@@ -37,6 +39,7 @@ const SocketChat = () => {
   const [activeStream, setActiveStream] = useState<ActiveStream>({});
 
   const [openDeleteId, setOpenDeleteId] = useState<string | null>(null);
+  const [showTextInput, setShowTextInput] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
 
@@ -147,6 +150,17 @@ const SocketChat = () => {
     }
   };
 
+  const handleText = (messge: string) => {
+    if (socket) {
+      socket.emit("streaming_event", {
+        text: messge,
+        type: "text",
+        id: Date.now().toLocaleString(),
+      });
+    }
+    setShowTextInput(false);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-gray-200">
       {/* Navbar */}
@@ -175,27 +189,45 @@ const SocketChat = () => {
       </div>
 
       {/* Sticky Bottom Action Bar */}
-      <div className="h-20 flex items-center justify-evenly gap-4 bg-gray-900 px-6 py-4 border-t border-gray-700">
-        <IconButton
-          icon={Aperture}
-          onClick={sendMessage}
-          variant="secondary"
-          size="medium"
-        />
-        <IconButton
-          icon={Mic}
-          onClick={handleRecording}
-          variant="secondary"
-          size="medium"
-          glow={isRecording}
-        />
-        <IconButton
-          icon={Keyboard}
-          onClick={() => console.log("Typing...")}
-          variant="secondary"
-          size="medium"
-        />
-      </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        {showTextInput ? (
+          <TextInputBar
+            key="input"
+            onSend={handleText}
+            onCancel={() => setShowTextInput(false)}
+          />
+        ) : (
+          <motion.div
+            key="buttons"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.2 }}
+            className="h-20 flex items-center justify-evenly gap-4 bg-gray-900 px-6 py-4 border-t border-gray-700"
+          >
+            <IconButton
+              icon={Aperture}
+              onClick={sendMessage}
+              variant="secondary"
+              size="medium"
+            />
+            <IconButton
+              icon={Mic}
+              onClick={handleRecording}
+              variant="secondary"
+              size="medium"
+              glow={isRecording}
+            />
+            <IconButton
+              icon={Keyboard}
+              onClick={() => setShowTextInput(true)}
+              variant="secondary"
+              size="medium"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
